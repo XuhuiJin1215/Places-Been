@@ -121,26 +121,65 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
 /* ══════════════════════════
    TAB 2 — GLOBE VIEW
 ══════════════════════════ */
-.globe-layout{display:flex;flex:1;min-height:0;}
-#globe-container{flex:1;min-width:0;position:relative;background:var(--bg);}
+.globe-layout{display:flex;flex:1;min-height:0;position:relative;}
+#globe-container{position:absolute;inset:0;background:var(--bg);}
 #globe-el{width:100%;height:100%;}
 
-/* Side panel */
-.globe-side{width:300px;flex-shrink:0;display:flex;flex-direction:column;border-left:0.5px solid var(--border);background:var(--panel);overflow:hidden;}
-.gfilters{padding:12px;border-bottom:0.5px solid var(--border);display:flex;flex-direction:column;gap:9px;}
-.gfilters label{font-size:10px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);display:block;margin-bottom:3px;}
-.gfilters input[type=text]{width:100%;background:rgba(255,255,255,0.04);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:13px;outline:none;}
-.gfilters input[type=text]:focus{border-color:var(--accent);}
-.yr-row{display:flex;align-items:center;gap:8px;}
-.yr-row input[type=range]{flex:1;accent-color:var(--accent);cursor:pointer;}
-.yr-val{font-size:12px;color:var(--accent);min-width:30px;text-align:right;}
-.type-btns{display:flex;gap:5px;flex-wrap:wrap;}
-.tbtn{padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;border:0.5px solid var(--border2);background:transparent;color:var(--muted);transition:all 0.15s;font-family:inherit;}
+/* Floating filter bar — top of globe */
+.gfilter-bar{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:6px;
+  background:rgba(10,15,30,0.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:0.5px solid var(--border2);border-radius:40px;
+  padding:6px 10px;z-index:50;white-space:nowrap;
+}
+.gfbar-search{position:relative;display:flex;align-items:center;}
+.gfbar-search input{
+  background:transparent;border:none;outline:none;
+  color:var(--text);font-size:13px;font-family:inherit;
+  width:0;max-width:180px;padding:0;
+  transition:width 0.25s ease,padding 0.25s ease;
+}
+.gfbar-search.open input{width:150px;padding:0 6px;}
+.gfbar-icon-btn{
+  background:none;border:none;cursor:pointer;
+  color:var(--muted);font-size:15px;line-height:1;padding:2px 4px;
+  transition:color 0.15s;display:flex;align-items:center;
+}
+.gfbar-icon-btn:hover{color:var(--text);}
+.gfbar-divider{width:0.5px;height:16px;background:var(--border2);margin:0 2px;flex-shrink:0;}
+.gfbar-select{
+  background:transparent;border:none;outline:none;
+  color:var(--text);font-size:12px;font-family:inherit;cursor:pointer;
+  padding:2px 18px 2px 4px;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%237a8baa'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 2px center;
+}
+.gfbar-select option{background:#111827;}
+.type-btns{display:flex;gap:4px;}
+.tbtn{padding:3px 9px;border-radius:20px;font-size:11px;cursor:pointer;border:0.5px solid var(--border2);background:transparent;color:var(--muted);transition:all 0.15s;font-family:inherit;}
 .tbtn.ta-all{background:var(--accent-dim);color:var(--accent);border-color:transparent;}
 .tbtn.ta-attraction{background:var(--green-dim);color:var(--green);border-color:transparent;}
 .tbtn.ta-transportation{background:var(--amber-dim);color:var(--amber);border-color:transparent;}
 .tbtn.ta-other{background:var(--purple-dim);color:var(--purple);border-color:transparent;}
 
+/* City list panel — slides in from right */
+.gcity-panel{
+  position:absolute;top:0;right:0;bottom:0;width:260px;
+  background:rgba(17,24,39,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-left:0.5px solid var(--border);
+  display:flex;flex-direction:column;z-index:40;
+  transform:translateX(100%);transition:transform 0.25s ease;
+}
+.gcity-panel.open{transform:translateX(0);}
+.gcity-panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;border-bottom:0.5px solid var(--border);flex-shrink:0;
+}
+.gcity-panel-title{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);}
+.gcity-panel-close{background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:0;}
+.gcity-panel-close:hover{color:var(--text);}
 .gcity-list{flex:1;overflow-y:auto;}
 .gcity-list::-webkit-scrollbar{width:4px;}
 .gcity-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}
@@ -149,6 +188,21 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
 .gcity-n{font-size:13px;font-weight:500;color:var(--text);margin-bottom:1px;}
 .gcity-m{font-size:11px;color:var(--muted);}
 .gcity-p{font-size:11px;color:var(--accent);margin-top:2px;}
+
+/* List toggle button (bottom-right of globe) */
+.glist-toggle{
+  position:absolute;bottom:20px;right:20px;z-index:50;
+  background:rgba(10,15,30,0.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:0.5px solid var(--border2);border-radius:var(--radius-lg);
+  padding:8px 14px;font-size:12px;font-weight:500;color:var(--accent);
+  cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;
+  transition:background 0.15s;
+}
+.glist-toggle:hover{background:rgba(79,156,249,0.15);}
+.glist-count{
+  background:var(--accent-dim);border-radius:10px;
+  padding:1px 7px;font-size:11px;color:var(--accent);
+}
 
 /* Popup */
 #popup{position:absolute;background:var(--panel);border:0.5px solid rgba(79,156,249,0.35);border-radius:var(--radius-lg);padding:14px 16px;max-width:260px;min-width:200px;z-index:100;box-shadow:0 6px 28px rgba(0,0,0,0.6);opacity:0;pointer-events:none;transition:opacity 0.15s;}
@@ -226,36 +280,49 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
     <div class="globe-layout">
       <div id="globe-container">
         <div id="globe-el"></div>
+
+        <!-- Floating filter bar -->
+        <div class="gfilter-bar">
+          <!-- Search (expands on click) -->
+          <div class="gfbar-search" id="gfbar-search">
+            <button class="gfbar-icon-btn" id="gfbar-search-btn" title="Search">&#128269;</button>
+            <input type="text" id="g-search" placeholder="City or place…">
+          </div>
+          <div class="gfbar-divider"></div>
+          <!-- Year dropdown -->
+          <select class="gfbar-select" id="g-year" title="Filter by year">
+            <option value="">All years</option>
+          </select>
+          <div class="gfbar-divider"></div>
+          <!-- Type pills -->
+          <div class="type-btns">
+            <button class="tbtn ta-all" data-t="all">All</button>
+            <button class="tbtn" data-t="attraction">Attraction</button>
+            <button class="tbtn" data-t="transportation">Transport</button>
+            <button class="tbtn" data-t="other">Other</button>
+          </div>
+        </div>
+
+        <!-- City list panel (slides in from right) -->
+        <div class="gcity-panel" id="gcity-panel">
+          <div class="gcity-panel-header">
+            <span class="gcity-panel-title">Cities</span>
+            <button class="gcity-panel-close" id="gcity-panel-close">×</button>
+          </div>
+          <div class="gcity-list" id="g-city-list"></div>
+        </div>
+
+        <!-- Toggle list button -->
+        <button class="glist-toggle" id="glist-toggle">
+          &#9776; Cities <span class="glist-count" id="glist-count">0</span>
+        </button>
+
+        <!-- Popup -->
         <div id="popup">
           <button class="popup-close" id="popup-close">×</button>
           <div class="popup-city" id="popup-city"></div>
           <div id="popup-places"></div>
         </div>
-      </div>
-      <div class="globe-side">
-        <div class="gfilters">
-          <div>
-            <label>Search</label>
-            <input type="text" id="g-search" placeholder="City or place…">
-          </div>
-          <div>
-            <label>Year</label>
-            <div class="yr-row">
-              <input type="range" id="g-year" min="2000" max="2026" value="2000">
-              <div class="yr-val" id="g-year-val">All</div>
-            </div>
-          </div>
-          <div>
-            <label>Type</label>
-            <div class="type-btns">
-              <button class="tbtn ta-all" data-t="all">All</button>
-              <button class="tbtn" data-t="attraction">Attraction</button>
-              <button class="tbtn" data-t="transportation">Transport</button>
-              <button class="tbtn" data-t="other">Other</button>
-            </div>
-          </div>
-        </div>
-        <div class="gcity-list" id="g-city-list"></div>
       </div>
     </div>
   </div>
@@ -432,7 +499,8 @@ function toggleCity(name) {
 
 function populateFilters() {
   const countrySelect = document.getElementById('list-country');
-  const yearSelect = document.getElementById('list-year');
+  const listYearSelect = document.getElementById('list-year');
+  const globeYearSelect = document.getElementById('g-year');
   const countries = [...new Set(allCities.map(c => c.countryCode))].sort();
   countries.forEach(code => {
     const city = allCities.find(c => c.countryCode === code);
@@ -443,15 +511,13 @@ function populateFilters() {
   });
   const years = [...new Set(allCities.flatMap(c => c.allYears))].sort();
   years.forEach(y => {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y;
-    yearSelect.appendChild(opt);
+    const o1 = document.createElement('option');
+    o1.value = y; o1.textContent = y;
+    listYearSelect.appendChild(o1);
+    const o2 = document.createElement('option');
+    o2.value = y; o2.textContent = y;
+    globeYearSelect.appendChild(o2);
   });
-  // Set year slider range
-  const yr = document.getElementById('g-year');
-  yr.min = parseInt(years[0]) - 1;
-  yr.max = parseInt(years[years.length - 1]);
-  yr.value = yr.min;
 }
 
 // ─────────────────────────────────────
@@ -478,9 +544,11 @@ function gFPlaces(city) {
 function renderGCityList() {
   const el = document.getElementById('g-city-list');
   el.innerHTML = '';
+  let count = 0;
   gFiltered().forEach(c => {
     const ps = gFPlaces(c);
     if (!ps.length) return;
+    count++;
     const d = document.createElement('div');
     d.className = 'gcity-item' + (gSelCity === c.name ? ' gsel' : '');
     d.innerHTML = `<div class="gcity-n">${c.name}</div><div class="gcity-m">${c.country}</div><div class="gcity-p">${ps.length} place${ps.length !== 1 ? 's' : ''}</div>`;
@@ -491,6 +559,7 @@ function renderGCityList() {
     });
     el.appendChild(d);
   });
+  document.getElementById('glist-count').textContent = count;
 }
 
 function showPopup(city, px, py) {
@@ -530,9 +599,12 @@ function hidePopup() {
 function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
+  // Scale dot size by current camera altitude (zoom level)
+  const alt = globe.pointOfView().altitude || 2.5;
+  const zoomScale = Math.max(0.3, Math.min(1.0, alt / 2.5));
   const points = fc.map(c => ({
     lat: c.lat, lng: c.lng, city: c,
-    size: 0.35 + Math.min(gFPlaces(c).length * 0.12, 0.9),
+    size: (0.28 + Math.min(gFPlaces(c).length * 0.09, 0.7)) * zoomScale,
     color: gSelCity === c.name ? '#ffffff' : '#4f9cf9'
   }));
   globe.pointsData(points);
@@ -586,6 +658,8 @@ async function initGlobe() {
   globe.controls().autoRotateSpeed = 0.5;
   globe.controls().enableZoom = true;
   el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
+  // Update point sizes on zoom
+  globe.controls().addEventListener('change', () => { updateGlobe(); });
 
   // Responsive sizing
   const ro = new ResizeObserver(() => {
@@ -677,13 +751,35 @@ async function init() {
 
   // Wire globe controls
   document.getElementById('g-search').addEventListener('input', e => { gSearch = e.target.value; applyGFilters(); });
-  const yrSlider = document.getElementById('g-year');
-  yrSlider.addEventListener('input', e => {
-    const v = parseInt(e.target.value);
-    if (v <= parseInt(yrSlider.min)) { gYear = 0; document.getElementById('g-year-val').textContent = 'All'; }
-    else { gYear = v; document.getElementById('g-year-val').textContent = v; }
+
+  // Search bar expand/collapse
+  const gfbarSearch = document.getElementById('gfbar-search');
+  document.getElementById('gfbar-search-btn').addEventListener('click', () => {
+    gfbarSearch.classList.toggle('open');
+    if (gfbarSearch.classList.contains('open')) {
+      document.getElementById('g-search').focus();
+    } else {
+      gSearch = '';
+      document.getElementById('g-search').value = '';
+      applyGFilters();
+    }
+  });
+  document.getElementById('g-search').addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      gfbarSearch.classList.remove('open');
+      gSearch = '';
+      e.target.value = '';
+      applyGFilters();
+    }
+  });
+
+  // Year dropdown
+  document.getElementById('g-year').addEventListener('change', e => {
+    gYear = e.target.value ? parseInt(e.target.value) : 0;
     applyGFilters();
   });
+
+  // Type pills
   document.querySelectorAll('.tbtn').forEach(btn => {
     btn.addEventListener('click', () => {
       gType = btn.dataset.t;
@@ -692,6 +788,15 @@ async function init() {
       applyGFilters();
     });
   });
+
+  // City panel toggle
+  document.getElementById('glist-toggle').addEventListener('click', () => {
+    document.getElementById('gcity-panel').classList.toggle('open');
+  });
+  document.getElementById('gcity-panel-close').addEventListener('click', () => {
+    document.getElementById('gcity-panel').classList.remove('open');
+  });
+
   document.getElementById('popup-close').addEventListener('click', hidePopup);
 
   document.getElementById('loading').style.display = 'none';
