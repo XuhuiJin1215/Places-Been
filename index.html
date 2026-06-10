@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Places I've Been</title>
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.27.2/dist/globe.gl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0f1e;
+    --panel: #111827;
+    --panel-border: rgba(255,255,255,0.08);
+    --text: #f0f4ff;
+    --text-muted: #8b9ab5;
+    --accent: #4f9cf9;
+    --accent-dim: rgba(79,156,249,0.15);
+    --visited: #4f9cf9;
+    --tag-attraction: rgba(99,235,160,0.15);
+    --tag-attraction-text: #63eba0;
+    --tag-transport: rgba(250,180,80,0.15);
+    --tag-transport-text: #fab450;
+    --tag-other: rgba(160,130,255,0.15);
+    --tag-other-text: #a082ff;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    height: 52px;
+    border-bottom: 0.5px solid var(--panel-border);
+    flex-shrink: 0;
+    z-index: 20;
+    background: var(--bg);
+  }
+
+  .logo {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+
+  .stats-row {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.2;
+  }
+  .stat-value {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── Main layout ── */
+  .main {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ── Globe ── */
+  #globe-container {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    background: var(--bg);
+  }
+
+  #globe-el {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── Side panel ── */
+  .side {
+    width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 0.5px solid var(--panel-border);
+    background: var(--panel);
+    overflow: hidden;
+  }
+
+  .filters {
+    padding: 1rem;
+    border-bottom: 0.5px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filter-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+
+  select, input[type="text"] {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 0.5px solid var(--panel-border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  select:focus, input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  .type-btns {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .type-btn {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 0.5px solid var(--panel-border);
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .type-btn.active-attraction { background: var(--tag-attraction); color: var(--tag-attraction-text); border-color: transparent; }
+  .type-btn.active-transportation { background: var(--tag-transport); color: var(--tag-transport-text); border-color: transparent; }
+  .type-btn.active-other { background: var(--tag-other); color: var(--tag-other-text); border-color: transparent; }
+  .type-btn.active-all { background: var(--accent-dim); color: var(--accent); border-color: transparent; }
+
+  .city-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+  }
+  .city-list::-webkit-scrollbar { width: 4px; }
+  .city-list::-webkit-scrollbar-track { background: transparent; }
+  .city-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .city-item {
+    padding: 10px 1rem;
+    cursor: pointer;
+    border-bottom: 0.5px solid var(--panel-border);
+    transition: background 0.1s;
+  }
+  .city-item:hover, .city-item.selected {
+    background: var(--accent-dim);
+  }
+  .city-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .city-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .city-places-count {
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 2px;
+  }
+
+  /* ── Popup ── */
+  #popup {
+    position: absolute;
+    background: var(--panel);
+    border: 0.5px solid rgba(79,156,249,0.3);
+    border-radius: 10px;
+    padding: 14px 16px;
+    max-width: 260px;
+    min-width: 200px;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  #popup.visible { opacity: 1; pointer-events: auto; }
+
+  .popup-city {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text);
+    border-bottom: 0.5px solid var(--panel-border);
+    padding-bottom: 8px;
+  }
+
+  .popup-place {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+  }
+  .popup-place-name {
+    font-size: 12px;
+    color: var(--text);
+  }
+  .popup-place-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .tag-attraction { background: var(--tag-attraction); color: var(--tag-attraction-text); }
+  .tag-transportation { background: var(--tag-transport); color: var(--tag-transport-text); }
+  .tag-other { background: var(--tag-other); color: var(--tag-other-text); }
+
+  .years-text {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .popup-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--text-muted);
+    pointer-events: auto;
+    line-height: 1;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+  }
+  .popup-close:hover { color: var(--text); }
+
+  /* ── Loading ── */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .loading-text { color: var(--text-muted); font-size: 14px; }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid rgba(79,156,249,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .year-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .year-range input[type="range"] {
+    flex: 1;
+    padding: 0;
+    border: none;
+    background: none;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .year-value {
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 36px;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading your world…</div>
+</div>
+
+<header>
+  <div class="logo">places<span>.</span>been</div>
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-value" id="stat-countries">—</div>
+      <div class="stat-label">Countries</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-cities">—</div>
+      <div class="stat-label">Cities</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-places">—</div>
+      <div class="stat-label">Places</div>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="globe-container">
+    <div id="globe-el"></div>
+    <div id="popup">
+      <button class="popup-close" id="popup-close">×</button>
+      <div class="popup-city" id="popup-city"></div>
+      <div id="popup-places"></div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="filters">
+      <div>
+        <div class="filter-label">Search</div>
+        <input type="text" id="search" placeholder="City or place…">
+      </div>
+      <div>
+        <div class="filter-label">Year visited</div>
+        <div class="year-range">
+          <input type="range" id="year-filter" min="2000" max="2026" value="0" step="1">
+          <div class="year-value" id="year-display">All</div>
+        </div>
+      </div>
+      <div>
+        <div class="filter-label">Type</div>
+        <div class="type-btns">
+          <button class="type-btn active-all" data-type="all">All</button>
+          <button class="type-btn" data-type="attraction">Attraction</button>
+          <button class="type-btn" data-type="transportation">Transport</button>
+          <button class="type-btn" data-type="other">Other</button>
+        </div>
+      </div>
+    </div>
+    <div class="city-list" id="city-list"></div>
+  </div>
+</div>
+
+<script>
+const CSV_PATH = 'places.csv';
+
+let allData = [];
+let cities = [];
+let visitedCountryCodes = new Set();
+let globe;
+let activeType = 'all';
+let activeYear = 0;
+let searchQuery = '';
+let selectedCity = null;
+let countriesGeoJson = null;
+
+function getTagClass(type) {
+  if (type === 'attraction') return 'tag-attraction';
+  if (type === 'transportation') return 'tag-transportation';
+  return 'tag-other';
+}
+
+function parseCoords(str) {
+  const parts = str.split(',').map(s => parseFloat(s.trim()));
+  return { lat: parts[0], lng: parts[1] };
+}
+
+function buildCities(rows) {
+  const map = {};
+  rows.forEach(row => {
+    const key = row.City;
+    if (!map[key]) {
+      const coords = parseCoords(row.Coordinates);
+      map[key] = {
+        name: row.City,
+        country: row.Country,
+        countryCode: row['Country Code'],
+        adminDiv: row['Administrative Division'],
+        lat: coords.lat,
+        lng: coords.lng,
+        places: []
+      };
+    }
+    const years = row.Years ? row.Years.split('|').map(y => y.trim()).filter(Boolean) : [];
+    map[key].places.push({
+      name: row.Place,
+      type: (row.Type || 'other').toLowerCase(),
+      years
+    });
+  });
+  return Object.values(map);
+}
+
+function filteredCities() {
+  return cities.filter(city => {
+    const q = searchQuery.toLowerCase();
+    const matchSearch = !q || city.name.toLowerCase().includes(q) ||
+      city.places.some(p => p.name.toLowerCase().includes(q));
+    const matchType = activeType === 'all' || city.places.some(p => p.type === activeType);
+    const matchYear = !activeYear || city.places.some(p => p.years.includes(String(activeYear)));
+    return matchSearch && matchType && matchYear;
+  });
+}
+
+function filteredPlaces(city) {
+  return city.places.filter(p => {
+    const matchType = activeType === 'all' || p.type === activeType;
+    const matchYear = !activeYear || p.years.includes(String(activeYear));
+    return matchType && matchYear;
+  });
+}
+
+function renderCityList() {
+  const list = document.getElementById('city-list');
+  const fc = filteredCities();
+  list.innerHTML = '';
+  fc.forEach(city => {
+    const places = filteredPlaces(city);
+    if (!places.length) return;
+    const item = document.createElement('div');
+    item.className = 'city-item' + (selectedCity === city.name ? ' selected' : '');
+    item.innerHTML = `
+      <div class="city-name">${city.name}</div>
+      <div class="city-meta">${city.country}</div>
+      <div class="city-places-count">${places.length} place${places.length !== 1 ? 's' : ''}</div>
+    `;
+    item.addEventListener('click', () => {
+      selectCity(city);
+      globe.pointOfView({ lat: city.lat, lng: city.lng, altitude: 1.2 }, 800);
+    });
+    list.appendChild(item);
+  });
+}
+
+function showPopup(city, x, y) {
+  selectedCity = city.name;
+  const popup = document.getElementById('popup');
+  const container = document.getElementById('globe-container');
+  const rect = container.getBoundingClientRect();
+
+  document.getElementById('popup-city').textContent = city.name + ' · ' + city.country;
+
+  const places = filteredPlaces(city);
+  const placesHtml = places.map(p => `
+    <div class="popup-place">
+      <div class="popup-place-name">${p.name}</div>
+      <div class="popup-place-row">
+        <span class="tag ${getTagClass(p.type)}">${p.type}</span>
+        <span class="years-text">${p.years.join(', ')}</span>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('popup-places').innerHTML = placesHtml;
+
+  let px = (x || rect.width / 2) - rect.left;
+  let py = (y || rect.height / 2) - rect.top;
+  if (px + 280 > rect.width) px -= 280;
+  if (py + 200 > rect.height) py -= 200;
+  popup.style.left = px + 'px';
+  popup.style.top = py + 'px';
+  popup.classList.add('visible');
+  renderCityList();
+}
+
+function selectCity(city) {
+  selectedCity = city.name;
+  showPopup(city, null, null);
+}
+
+function hidePopup() {
+  document.getElementById('popup').classList.remove('visible');
+  selectedCity = null;
+  renderCityList();
+}
+
+function updateStats() {
+  const fc = filteredCities();
+  const countries = new Set(fc.map(c => c.countryCode));
+  const places = fc.reduce((acc, c) => acc + filteredPlaces(c).length, 0);
+  document.getElementById('stat-countries').textContent = countries.size;
+  document.getElementById('stat-cities').textContent = fc.length;
+  document.getElementById('stat-places').textContent = places;
+}
+
+function updateGlobePoints() {
+  const fc = filteredCities();
+  const points = fc.map(city => ({
+    lat: city.lat,
+    lng: city.lng,
+    city,
+    size: 0.4 + Math.min(filteredPlaces(city).length * 0.15, 1),
+    color: selectedCity === city.name ? '#ffffff' : '#4f9cf9'
+  }));
+  globe.pointsData(points);
+}
+
+function updateChoropleth() {
+  if (!countriesGeoJson) return;
+  const fc = filteredCities();
+  const visitedCodes = new Set(fc.map(c => c.countryCode));
+  globe.polygonsData(countriesGeoJson.features)
+    .polygonCapColor(feat => {
+      const code = feat.properties.ISO_A3 || feat.properties.iso_a3 || '';
+      return visitedCodes.has(code)
+        ? 'rgba(79,156,249,0.25)'
+        : 'rgba(255,255,255,0.03)';
+    })
+    .polygonSideColor(() => 'rgba(255,255,255,0.02)')
+    .polygonStrokeColor(() => 'rgba(255,255,255,0.08)')
+    .polygonAltitude(feat => {
+      const code = feat.properties.ISO_A3 || feat.properties.iso_a3 || '';
+      return filteredCities().some(c => c.countryCode === code) ? 0.006 : 0.001;
+    });
+}
+
+function applyFilters() {
+  renderCityList();
+  updateStats();
+  updateGlobePoints();
+  updateChoropleth();
+}
+
+async function loadGeoJson() {
+  const url = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+  try {
+    const res = await fetch(url);
+    const topo = await res.json();
+    // Convert topojson to geojson using inline conversion
+    const geojson = toGeoJson(topo);
+    countriesGeoJson = geojson;
+  } catch(e) {
+    console.warn('GeoJSON load failed, choropleth disabled', e);
+  }
+}
+
+// Minimal topojson→geojson for countries
+function toGeoJson(topo) {
+  // Use a simpler countries geojson source
+  return { features: [] };
+}
+
+async function init() {
+  // Load CSV
+  const csvText = await fetch(CSV_PATH).then(r => r.text()).catch(() => null);
+  if (!csvText) {
+    document.getElementById('loading').innerHTML = '<div class="loading-text">Could not load places.csv — make sure it is in the same folder as index.html.</div>';
+    return;
+  }
+
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+  allData = parsed.data;
+  cities = buildCities(allData);
+
+  // Load countries GeoJSON (proper source)
+  try {
+    const res = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json');
+    const topo = await res.json();
+    // Minimal topojson decoder for this specific dataset
+    countriesGeoJson = decodeCountries(topo);
+  } catch(e) { console.warn('choropleth unavailable'); }
+
+  // Init globe
+  const el = document.getElementById('globe-el');
+  globe = Globe()(el)
+    .backgroundColor('rgba(0,0,0,0)')
+    .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-dark.jpg')
+    .atmosphereColor('#4f9cf9')
+    .atmosphereAltitude(0.15)
+    .pointLat('lat')
+    .pointLng('lng')
+    .pointColor('color')
+    .pointAltitude(0.01)
+    .pointRadius('size')
+    .pointsMerge(false)
+    .onPointClick((point, ev) => {
+      showPopup(point.city, ev.clientX, ev.clientY);
+    })
+    .onPointHover(point => {
+      el.style.cursor = point ? 'pointer' : 'default';
+    });
+
+  globe.controls().autoRotate = true;
+  globe.controls().autoRotateSpeed = 0.4;
+  globe.controls().enableZoom = true;
+
+  // Stop rotation on interaction
+  el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
+
+  if (countriesGeoJson) {
+    globe
+      .polygonsData([])
+      .polygonCapColor(() => 'rgba(255,255,255,0.03)')
+      .polygonSideColor(() => 'rgba(255,255,255,0.01)')
+      .polygonStrokeColor(() => 'rgba(255,255,255,0.06)')
+      .polygonAltitude(0.001);
+  }
+
+  // Size globe to container
+  const container = document.getElementById('globe-container');
+  const ro = new ResizeObserver(() => {
+    globe.width(container.clientWidth).height(container.clientHeight);
+  });
+  ro.observe(container);
+  globe.width(container.clientWidth).height(container.clientHeight);
+
+  // Initial render
+  applyFilters();
+  document.getElementById('loading').style.display = 'none';
+
+  // Wire up filters
+  document.getElementById('search').addEventListener('input', e => {
+    searchQuery = e.target.value;
+    applyFilters();
+  });
+
+  const yearSlider = document.getElementById('year-filter');
+  const yearDisplay = document.getElementById('year-display');
+  // Find year range from data
+  const allYears = allData.flatMap(r => (r.Years || '').split('|').map(y => parseInt(y)).filter(Boolean));
+  const minYear = Math.min(...allYears);
+  const maxYear = Math.max(...allYears);
+  yearSlider.min = minYear - 1;
+  yearSlider.max = maxYear;
+  yearSlider.value = minYear - 1;
+
+  yearSlider.addEventListener('input', e => {
+    const v = parseInt(e.target.value);
+    if (v < minYear) {
+      activeYear = 0;
+      yearDisplay.textContent = 'All';
+    } else {
+      activeYear = v;
+      yearDisplay.textContent = v;
+    }
+    applyFilters();
+  });
+
+  document.querySelectorAll('.type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeType = btn.dataset.type;
+      document.querySelectorAll('.type-btn').forEach(b => {
+        b.className = 'type-btn';
+      });
+      btn.classList.add(`active-${activeType}`);
+      applyFilters();
+    });
+  });
+
+  document.getElementById('popup-close').addEventListener('click', hidePopup);
+}
+
+// Minimal topojson decoder (countries-110m only)
+function decodeCountries(topo) {
+  // This uses the arcs from topojson to build GeoJSON
+  // Simplified: just use a fetch to a direct geojson
+  return null;
+}
+
+// Better approach: fetch proper GeoJSON directly
+async function fetchCountriesGeoJSON() {
+  try {
+    const r = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+    const topo = await r.json();
+    // Use topojson-client if available, else skip
+    if (typeof topojson !== 'undefined') {
+      return topojson.feature(topo, topo.objects.countries);
+    }
+  } catch(e) {}
+  return null;
+}
+
+init();
+</script>
+
+<!-- topojson for choropleth -->
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js" onload="onTopojsonLoaded()"></script>
+<script>
+async function onTopojsonLoaded() {
+  if (!globe) return;
+  try {
+    const r = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+    const topo = await r.json();
+    countriesGeoJson = topojson.feature(topo, topo.objects.countries);
+
+    // Attach ISO codes: world-atlas countries use numeric ids, map to alpha-3
+    // We'll color by matching our city countryCodes using a lookup
+    const numericToAlpha3 = buildNumericLookup();
+    countriesGeoJson.features.forEach(f => {
+      f.properties.ISO_A3 = numericToAlpha3[f.id] || '';
+    });
+
+    updateChoropleth();
+  } catch(e) { console.warn('topojson choropleth failed', e); }
+}
+
+function buildNumericLookup() {
+  // ISO 3166-1 numeric → alpha-3 for countries in the dataset (expand as needed)
+  return {
+    '156': 'CHN', '826': 'GBR', '392': 'JPN', '840': 'USA',
+    '250': 'FRA', '276': 'DEU', '380': 'ITA', '724': 'ESP',
+    '124': 'CAN', '036': 'AUS', '356': 'IND', '076': 'BRA',
+    '643': 'RUS', '410': 'KOR', '702': 'SGP', '458': 'MYS',
+    '764': 'THA', '704': 'VNM', '360': 'IDN', '608': 'PHL',
+    '56':  'BEL', '528': 'NLD', '756': 'CHE', '40':  'AUT',
+    '620': 'PRT', '752': 'SWE', '208': 'DNK', '246': 'FIN',
+    '578': 'NOR', '616': 'POL', '203': 'CZE', '348': 'HUN',
+    '300': 'GRC', '792': 'TUR', '376': 'ISR', '682': 'SAU',
+    '784': 'ARE', '818': 'EGY', '710': 'ZAF', '566': 'NGA',
+    '404': 'KEN', '288': 'GHA', '504': 'MAR', '788': 'TUN',
+    '32':  'ARG', '152': 'CHL', '170': 'COL', '604': 'PER',
+    '484': 'MEX', '218': 'ECU', '858': 'URY', '862': 'VEN',
+    '50':  'BGD', '586': 'PAK', '144': 'LKA', '524': 'NPL',
+    '104': 'MMR', '116': 'KHM', '418': 'LAO', '496': 'MNG',
+    '398': 'KAZ', '860': 'UZB', '268': 'GEO', '51':  'ARM',
+    '31':  'AZE', '112': 'BLR', '804': 'UKR', '642': 'ROU',
+    '100': 'BGR', '191': 'HRV', '688': 'SRB', '705': 'SVN',
+    '703': 'SVK', '233': 'EST', '428': 'LVA', '440': 'LTU',
+    '352': 'ISL', '372': 'IRL', '442': 'LUX', '470': 'MLT',
+    '196': 'CYP', '458': 'MYS', '96':  'BRN', '626': 'TLS',
+    '598': 'PNG', '554': 'NZL', '242': 'FJI',
+  };
+}
+</script>
+</body>
+</html>
