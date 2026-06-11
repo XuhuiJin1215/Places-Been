@@ -597,19 +597,17 @@ function hidePopup() {
 
 function calcRadius() {
   const alt = globeReady ? (globe.pointOfView().altitude || 2.5) : 2.5;
-  return Math.max(0.06, Math.min(0.4, alt * 0.16));
+  // Returns globe-radius fraction: shrinks as you zoom in
+  return Math.max(0.015, Math.min(0.06, alt * 0.022));
 }
 
 function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
-  const baseRadius = calcRadius();
-  const points = fc.map(c => ({
-    lat: c.lat, lng: c.lng, city: c,
-    size: baseRadius + Math.min(gFPlaces(c).length * 0.012, 0.08),
-    color: gSelCity === c.name ? '#ffffff' : '#4f9cf9'
-  }));
-  globe.pointsData(points);
+
+  // Custom layer: Three.js Sprites — always face camera, no cylinder extrusion,
+  // reliably raycasted by globe.gl at any zoom level
+  globe.customLayerData(fc.map(c => ({ ...c, _nPlaces: gFPlaces(c).length })));
 
   // Choropleth
   if (globe._countriesData) {
@@ -628,21 +626,43 @@ function updateGlobe() {
   }
 }
 
-// Rescale only the radius accessor — no mesh rebuild, clicks stay intact
+// Rescale sprite sizes on zoom
 let _zoomTimer = null;
 function rescaleOnZoom() {
   if (!globeReady) return;
   clearTimeout(_zoomTimer);
   _zoomTimer = setTimeout(() => {
-    const baseRadius = calcRadius();
-    globe.pointRadius(d => baseRadius + Math.min(d.city.places.length * 0.012, 0.08));
-  }, 80);
+    const r = calcRadius();
+    globe.customLayerData().forEach(d => {
+      if (d.__threeObj) {
+        const s = (r + Math.min(d._nPlaces * 0.003, 0.02)) * 200;
+        d.__threeObj.scale.set(s, s, s);
+      }
+    });
+  }, 60);
+}
+
+// Build a circle sprite texture once
+function makeCircleTexture(color, selected) {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2, cy = size / 2, r = size / 2 - 3;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = selected ? '#ffffff' : '#4f9cf9';
+  ctx.fill();
+  ctx.strokeStyle = selected ? 'rgba(255,255,255,0.8)' : 'rgba(79,156,249,0.5)';
+  ctx.lineWidth = 3; ctx.stroke();
+  return canvas;
 }
 
 async function initGlobe() {
   const el = document.getElementById('globe-el');
   const container = document.getElementById('globe-container');
 
+  // Globe.gl bundles Three.js internally but may not expose it globally.
+  // Initialise globe first, then grab THREE from the scene's renderer context.
   globe = Globe()(el)
     .backgroundColor('rgba(0,0,0,0)')
     .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-dark.jpg')
@@ -650,14 +670,6 @@ async function initGlobe() {
     .atmosphereColor('#4f9cf9')
     .atmosphereAltitude(0.18)
     .pointsData([])
-    .pointLat('lat').pointLng('lng')
-    .pointColor('color')
-    .pointAltitude(0.004)          // small but nonzero — altitude 0 makes raycasting miss
-    .pointRadius('size')
-    .pointsMerge(false)
-    .pointsTransitionDuration(0)   // instant updates, no animation interfering with clicks
-    .onPointClick((pt, ev) => { showPopup(pt.city, ev.clientX, ev.clientY); })
-    .onPointHover(pt => { el.style.cursor = pt ? 'pointer' : 'default'; })
     .htmlElementsData([]);
 
   globe.controls().autoRotate = true;
@@ -665,6 +677,66 @@ async function initGlobe() {
   globe.controls().enableZoom = true;
   el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
   globe.controls().addEventListener('change', rescaleOnZoom);
+
+  // Responsive sizing
+  const ro = new ResizeObserver(() => {
+    globe.width(container.clientWidth).height(container.clientHeight);
+  });
+  ro.observe(container);
+  globe.width(container.clientWidth).height(container.clientHeight);
+
+  // Wait one frame for globe internals to initialise, then grab THREE
+  await new Promise(r => setTimeout(r, 100));
+
+  // THREE is exposed on the window by globe.gl's bundle
+  const T = window.THREE;
+
+  function makeCircleTex(selected) {
+    const size = 128;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.beginPath(); ctx.arc(size/2, size/2, size/2 - 6, 0, Math.PI*2);
+    ctx.fillStyle = selected ? '#ffffff' : '#4f9cf9';
+    ctx.fill();
+    ctx.strokeStyle = selected ? 'rgba(255,255,255,0.6)' : 'rgba(100,180,255,0.5)';
+    ctx.lineWidth = 6; ctx.stroke();
+    return c;
+  }
+
+  const normalTex   = T ? new T.CanvasTexture(makeCircleTex(false)) : null;
+  const selectedTex = T ? new T.CanvasTexture(makeCircleTex(true))  : null;
+
+  const makeSprite = (d, selected) => {
+    if (!T) return new (class { scale={set(){}} material={needsUpdate:false,map:null} })();
+    const mat = new T.SpriteMaterial({
+      map: selected ? selectedTex : normalTex,
+      transparent: true, depthWrite: false, sizeAttenuation: true
+    });
+    const sprite = new T.Sprite(mat);
+    const r = calcRadius();
+    const s = (r + Math.min((d._nPlaces||1) * 0.003, 0.02)) * 200;
+    sprite.scale.set(s, s, s);
+    return sprite;
+  };
+
+  globe
+    .customLayerData([])
+    .customThreeObject(d => makeSprite(d, gSelCity === d.name))
+    .customThreeObjectUpdate((obj, d) => {
+      const r = calcRadius();
+      const s = (r + Math.min((d._nPlaces||1) * 0.003, 0.02)) * 200;
+      obj.scale.set(s, s, s);
+      if (obj.material) {
+        obj.material.map = gSelCity === d.name ? selectedTex : normalTex;
+        obj.material.needsUpdate = true;
+      }
+    })
+    .customLayerLat('lat')
+    .customLayerLng('lng')
+    .customLayerAltitude(0.01)
+    .onCustomLayerClick((d, ev) => { showPopup(d, ev.clientX, ev.clientY); })
+    .onCustomLayerHover(d => { el.style.cursor = d ? 'pointer' : 'default'; });
 
   // Responsive sizing
   const ro = new ResizeObserver(() => {
