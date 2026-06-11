@@ -6,7 +6,6 @@
 <title>Places I've Been</title>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.27.2/dist/globe.gl.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
@@ -624,21 +623,6 @@ function updateGlobe() {
   }
 }
 
-const ISO_NUM_TO_A3 = {
-  4:'AFG',8:'ALB',12:'DZA',24:'AGO',32:'ARG',36:'AUS',40:'AUT',50:'BGD',
-  56:'BEL',68:'BOL',76:'BRA',100:'BGR',124:'CAN',144:'LKA',152:'CHL',
-  156:'CHN',170:'COL',191:'HRV',196:'CYP',203:'CZE',208:'DNK',218:'ECU',
-  818:'EGY',231:'ETH',246:'FIN',250:'FRA',276:'DEU',288:'GHA',300:'GRC',
-  348:'HUN',356:'IND',360:'IDN',364:'IRN',368:'IRQ',372:'IRL',376:'ISR',
-  380:'ITA',392:'JPN',400:'JOR',398:'KAZ',404:'KEN',408:'PRK',410:'KOR',
-  414:'KWT',418:'LAO',422:'LBN',440:'LTU',442:'LUX',484:'MEX',496:'MNG',
-  504:'MAR',528:'NLD',554:'NZL',566:'NGA',578:'NOR',524:'NPL',586:'PAK',
-  604:'PER',608:'PHL',616:'POL',620:'PRT',630:'PRI',634:'QAT',642:'ROU',
-  643:'RUS',682:'SAU',710:'ZAF',724:'ESP',144:'LKA',752:'SWE',756:'CHE',
-  158:'TWN',764:'THA',792:'TUR',784:'ARE',804:'UKR',826:'GBR',840:'USA',
-  858:'URY',862:'VEN',704:'VNM',887:'YEM',710:'ZAF',716:'ZWE',
-};
-
 async function initGlobe() {
   const el = document.getElementById('globe-el');
   const container = document.getElementById('globe-container');
@@ -668,13 +652,19 @@ async function initGlobe() {
   ro.observe(container);
   globe.width(container.clientWidth).height(container.clientHeight);
 
-  // Load choropleth
+  // Load choropleth — Natural Earth Admin-0 Map Units (splits territories/SARs)
+  // ISO_A3 is baked into each feature's properties directly; no numeric lookup needed.
+  // French Guiana=GUF, Hong Kong=HKG, Macau=MAC, Puerto Rico=PRI etc. are separate polygons.
+  // Hawaii & Alaska remain part of the USA polygon (same as real administrative practice).
   try {
-    const res = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
-    const topo = await res.json();
-    const geojson = topojson.feature(topo, topo.objects.countries);
+    const res = await fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_map_units.geojson');
+    const geojson = await res.json();
+    // Normalise: some features use ISO_A3_EH or ADM0_A3 as fallback when ISO_A3 is -99
     geojson.features.forEach(f => {
-      f.properties._iso3 = ISO_NUM_TO_A3[parseInt(f.id)] || '';
+      const p = f.properties;
+      f.properties._iso3 = (p.ISO_A3 && p.ISO_A3 !== '-99')
+        ? p.ISO_A3
+        : (p.ISO_A3_EH && p.ISO_A3_EH !== '-99') ? p.ISO_A3_EH : (p.ADM0_A3 || '');
     });
     globe._countriesData = geojson.features;
     globe
@@ -683,7 +673,7 @@ async function initGlobe() {
       .polygonSideColor(() => 'rgba(255,255,255,0.01)')
       .polygonStrokeColor(() => 'rgba(255,255,255,0.07)')
       .polygonAltitude(0.001);
-  } catch(e) { console.warn('Choropleth unavailable'); }
+  } catch(e) { console.warn('Choropleth unavailable', e); }
 
   globeReady = true;
   updateGlobe();
