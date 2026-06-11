@@ -597,7 +597,7 @@ function hidePopup() {
 
 function calcRadius() {
   const alt = globeReady ? (globe.pointOfView().altitude || 2.5) : 2.5;
-  return Math.max(0.06, Math.min(0.45, alt * 0.18));
+  return Math.max(0.06, Math.min(0.4, alt * 0.16));
 }
 
 function updateGlobe() {
@@ -606,12 +606,12 @@ function updateGlobe() {
   const baseRadius = calcRadius();
   const points = fc.map(c => ({
     lat: c.lat, lng: c.lng, city: c,
-    size: baseRadius + Math.min(gFPlaces(c).length * 0.015, 0.1),
+    size: baseRadius + Math.min(gFPlaces(c).length * 0.012, 0.08),
     color: gSelCity === c.name ? '#ffffff' : '#4f9cf9'
   }));
   globe.pointsData(points);
 
-  // Choropleth — altitude kept above 0 to avoid z-fighting flicker
+  // Choropleth
   if (globe._countriesData) {
     const visitedCodes = new Set(fc.map(c => c.countryCode));
     globe.polygonsData(globe._countriesData)
@@ -628,16 +628,15 @@ function updateGlobe() {
   }
 }
 
-// Rescale point radii only — does NOT rebuild pointsData, so clicks stay intact
+// Rescale only the radius accessor — no mesh rebuild, clicks stay intact
 let _zoomTimer = null;
 function rescaleOnZoom() {
   if (!globeReady) return;
   clearTimeout(_zoomTimer);
   _zoomTimer = setTimeout(() => {
     const baseRadius = calcRadius();
-    // Update size in-place by reassigning pointRadius accessor
-    globe.pointRadius(d => baseRadius + Math.min(d.city.places.length * 0.015, 0.1));
-  }, 60);
+    globe.pointRadius(d => baseRadius + Math.min(d.city.places.length * 0.012, 0.08));
+  }, 80);
 }
 
 async function initGlobe() {
@@ -650,23 +649,21 @@ async function initGlobe() {
     .bumpImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
     .atmosphereColor('#4f9cf9')
     .atmosphereAltitude(0.18)
-    // pointAltitude 0 = flat disc on surface, not an extruded cylinder
     .pointsData([])
     .pointLat('lat').pointLng('lng')
     .pointColor('color')
-    .pointAltitude(0)
+    .pointAltitude(0.004)          // small but nonzero — altitude 0 makes raycasting miss
     .pointRadius('size')
     .pointsMerge(false)
+    .pointsTransitionDuration(0)   // instant updates, no animation interfering with clicks
     .onPointClick((pt, ev) => { showPopup(pt.city, ev.clientX, ev.clientY); })
     .onPointHover(pt => { el.style.cursor = pt ? 'pointer' : 'default'; })
-    // Clear html layer
     .htmlElementsData([]);
 
   globe.controls().autoRotate = true;
   globe.controls().autoRotateSpeed = 0.5;
   globe.controls().enableZoom = true;
   el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
-  // Rescale dot sizes on zoom without rebuilding the mesh (preserves click handlers)
   globe.controls().addEventListener('change', rescaleOnZoom);
 
   // Responsive sizing
