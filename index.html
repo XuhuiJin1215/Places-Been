@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Places I've Been</title>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.27.2/dist/globe.gl.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -18,7 +17,6 @@
   --border2: rgba(255,255,255,0.14);
   --text: #e8eeff;
   --muted: #7a8baa;
-  --muted2: #4a5a78;
   --accent: #4f9cf9;
   --accent-dim: rgba(79,156,249,0.12);
   --accent-dim2: rgba(79,156,249,0.22);
@@ -57,7 +55,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .tab{padding:10px 18px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color 0.15s,border-color 0.15s;user-select:none;}
 .tab:hover{color:var(--text);}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-.tab-icon{margin-right:6px;font-size:14px;vertical-align:-1px;}
 
 /* ── Tab panels ── */
 .tab-panel{display:none;flex:1;min-height:0;}
@@ -68,7 +65,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 ══════════════════════════ */
 .list-wrap{display:flex;flex:1;min-height:0;flex-direction:column;}
 
-/* Toolbar */
 .toolbar{display:flex;align-items:center;gap:10px;padding:10px 1.5rem;border-bottom:0.5px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
 .toolbar-search{position:relative;flex:1;min-width:160px;max-width:280px;}
 .toolbar-search input{width:100%;background:var(--panel);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px 7px 32px;font-size:13px;outline:none;}
@@ -77,10 +73,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .toolbar select{background:var(--panel);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 28px 7px 10px;font-size:13px;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a8baa'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;cursor:pointer;}
 .toolbar-right{margin-left:auto;color:var(--muted);font-size:12px;}
 
-/* Table */
 .table-scroll{flex:1;overflow-y:auto;overflow-x:auto;}
 .table-scroll::-webkit-scrollbar{width:5px;height:5px;}
-.table-scroll::-webkit-scrollbar-track{background:transparent;}
 .table-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px;}
 
 table{width:100%;border-collapse:collapse;}
@@ -104,14 +98,12 @@ tbody td{padding:11px 14px;vertical-align:middle;}
 .city-row.expanded .expand-icon{transform:rotate(90deg);}
 .years-cell{font-size:12px;color:var(--muted);}
 
-/* Collapsible detail row */
 tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
 .detail-inner{overflow:hidden;max-height:0;transition:max-height 0.28s ease;}
 .detail-inner.open{max-height:600px;}
 .detail-content{padding:12px 14px 16px 42px;display:flex;flex-direction:column;gap:6px;}
 .place-item{display:flex;align-items:flex-start;gap:10px;padding:7px 10px;background:var(--panel2);border-radius:var(--radius);border:0.5px solid var(--border);}
 .place-name{flex:1;font-size:13px;color:var(--text);}
-.place-sub{font-size:11px;color:var(--muted);margin-top:1px;}
 .type-pill{flex-shrink:0;font-size:10px;font-weight:500;padding:2px 8px;border-radius:10px;}
 .tp-attraction{background:var(--green-dim);color:var(--green);}
 .tp-transportation{background:var(--amber-dim);color:var(--amber);}
@@ -125,7 +117,7 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
 #globe-container{position:absolute;inset:0;background:var(--bg);}
 #globe-el{width:100%;height:100%;}
 
-/* Floating filter bar — top of globe */
+/* Floating filter bar */
 .gfilter-bar{
   position:absolute;top:14px;left:50%;transform:translateX(-50%);
   display:flex;align-items:center;gap:6px;
@@ -189,7 +181,7 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
 .gcity-m{font-size:11px;color:var(--muted);}
 .gcity-p{font-size:11px;color:var(--accent);margin-top:2px;}
 
-/* List toggle button (bottom-right of globe) */
+/* List toggle button */
 .glist-toggle{
   position:absolute;bottom:20px;right:20px;z-index:50;
   background:rgba(10,15,30,0.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
@@ -243,18 +235,14 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
           <span class="icon">&#128269;</span>
           <input type="text" id="list-search" placeholder="Search cities or places…">
         </div>
-        <select id="list-country">
-          <option value="">All countries</option>
-        </select>
+        <select id="list-country"><option value="">All countries</option></select>
         <select id="list-type">
           <option value="">All types</option>
           <option value="attraction">Attraction</option>
           <option value="transportation">Transportation</option>
           <option value="other">Other</option>
         </select>
-        <select id="list-year">
-          <option value="">All years</option>
-        </select>
+        <select id="list-year"><option value="">All years</option></select>
         <div class="toolbar-right" id="list-count"></div>
       </div>
       <div class="table-scroll">
@@ -281,20 +269,16 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
       <div id="globe-container">
         <div id="globe-el"></div>
 
-        <!-- Floating filter bar -->
         <div class="gfilter-bar">
-          <!-- Search (expands on click) -->
           <div class="gfbar-search" id="gfbar-search">
             <button class="gfbar-icon-btn" id="gfbar-search-btn" title="Search">&#128269;</button>
             <input type="text" id="g-search" placeholder="City or place…">
           </div>
           <div class="gfbar-divider"></div>
-          <!-- Year dropdown -->
           <select class="gfbar-select" id="g-year" title="Filter by year">
             <option value="">All years</option>
           </select>
           <div class="gfbar-divider"></div>
-          <!-- Type pills -->
           <div class="type-btns">
             <button class="tbtn ta-all" data-t="all">All</button>
             <button class="tbtn" data-t="attraction">Attraction</button>
@@ -303,7 +287,6 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
           </div>
         </div>
 
-        <!-- City list panel (slides in from right) -->
         <div class="gcity-panel" id="gcity-panel">
           <div class="gcity-panel-header">
             <span class="gcity-panel-title">Cities</span>
@@ -312,12 +295,10 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
           <div class="gcity-list" id="g-city-list"></div>
         </div>
 
-        <!-- Toggle list button -->
         <button class="glist-toggle" id="glist-toggle">
           &#9776; Cities <span class="glist-count" id="glist-count">0</span>
         </button>
 
-        <!-- Popup -->
         <div id="popup">
           <button class="popup-close" id="popup-close">×</button>
           <div class="popup-city" id="popup-city"></div>
@@ -329,18 +310,22 @@ tr.detail-row td{padding:0;border-bottom:0.5px solid var(--border2);}
 </div>
 
 <script>
+'use strict';
+
 const CSV_PATH = 'places.csv';
 
-// ── State ──
+// ─── State ───
 let allCities = [];
 let sortCol = 'name', sortDir = 1;
 let listSearch = '', listCountry = '', listType = '', listYear = '';
-let gSearch = '', gType = 'all', gYear = 0;
+let gSearch = '', gType = 'all', gYear = '';
 let expandedCity = null;
 let gSelCity = null;
-let globe, globeReady = false;
+let globe = null;
+let globeReady = false;
+let globeInited = false;
 
-// ── Parse CSV ──
+// ─── CSV parsing ───
 function parseCities(rows) {
   const map = {};
   rows.forEach(r => {
@@ -364,14 +349,13 @@ function parseCities(rows) {
       years
     });
   });
-  // Compute derived fields
   return Object.values(map).map(c => {
     const allYears = [...new Set(c.places.flatMap(p => p.years))].sort();
-    return { ...c, allYears };
+    return Object.assign({}, c, { allYears });
   });
 }
 
-// ── Stats (always from full dataset) ──
+// ─── Stats ───
 function updateStats() {
   const countries = new Set(allCities.map(c => c.countryCode));
   const places = allCities.reduce((a, c) => a + c.places.length, 0);
@@ -380,9 +364,15 @@ function updateStats() {
   document.getElementById('stat-p').textContent = places;
 }
 
-// ─────────────────────────────────────
-//  TAB 1 — LIST
-// ─────────────────────────────────────
+function typePillClass(t) {
+  if (t === 'attraction') return 'tp-attraction';
+  if (t === 'transportation') return 'tp-transportation';
+  return 'tp-other';
+}
+
+// ═══════════════════════════
+// TAB 1 — LIST
+// ═══════════════════════════
 function listFiltered() {
   const q = listSearch.toLowerCase();
   return allCities.filter(c => {
@@ -396,7 +386,7 @@ function listFiltered() {
 }
 
 function sortedCities(arr) {
-  return [...arr].sort((a, b) => {
+  return arr.slice().sort((a, b) => {
     let av, bv;
     if (sortCol === 'places') { av = a.places.length; bv = b.places.length; }
     else if (sortCol === 'years') { av = a.allYears.length; bv = b.allYears.length; }
@@ -407,70 +397,53 @@ function sortedCities(arr) {
   });
 }
 
-function typePillClass(t) {
-  if (t === 'attraction') return 'tp-attraction';
-  if (t === 'transportation') return 'tp-transportation';
-  return 'tp-other';
-}
-
 function renderTable() {
   const data = sortedCities(listFiltered());
-  document.getElementById('list-count').textContent = `${data.length} cities`;
+  document.getElementById('list-count').textContent = data.length + ' cities';
   const tbody = document.getElementById('city-tbody');
   tbody.innerHTML = '';
 
   data.forEach(city => {
     const isExp = expandedCity === city.name;
-
-    // City row
-    const tr = document.createElement('tr');
-    tr.className = 'city-row' + (isExp ? ' expanded' : '');
-    tr.dataset.city = city.name;
-
-    // Filter places by active list filters
     const visPlaces = city.places.filter(p => {
       const mt = !listType || p.type === listType;
       const my = !listYear || p.years.includes(listYear);
       return mt && my;
     });
-
     const yearSpan = city.allYears.length > 0
       ? city.allYears[0] + (city.allYears.length > 1 ? '–' + city.allYears[city.allYears.length-1] : '')
       : '—';
 
-    tr.innerHTML = `
-      <td><span class="expand-icon">&#9658;</span></td>
-      <td>
-        <div class="city-main">${city.name}</div>
-      </td>
-      <td><span class="country-badge">${city.country}</span></td>
-      <td><span style="font-size:12px;color:var(--muted);">${city.admin}</span></td>
-      <td><span class="places-count">${visPlaces.length}</span></td>
-      <td class="years-cell">${yearSpan}</td>
-    `;
-    tr.addEventListener('click', () => toggleCity(city.name));
+    const tr = document.createElement('tr');
+    tr.className = 'city-row' + (isExp ? ' expanded' : '');
+    tr.innerHTML =
+      '<td><span class="expand-icon">&#9658;</span></td>' +
+      '<td><div class="city-main">' + city.name + '</div></td>' +
+      '<td><span class="country-badge">' + city.country + '</span></td>' +
+      '<td><span style="font-size:12px;color:var(--muted);">' + city.admin + '</span></td>' +
+      '<td><span class="places-count">' + visPlaces.length + '</span></td>' +
+      '<td class="years-cell">' + yearSpan + '</td>';
+    tr.addEventListener('click', () => {
+      expandedCity = (expandedCity === city.name) ? null : city.name;
+      renderTable();
+    });
     tbody.appendChild(tr);
 
-    // Detail row
     const dr = document.createElement('tr');
     dr.className = 'detail-row';
-    dr.dataset.city = city.name;
     const td = document.createElement('td');
     td.colSpan = 6;
     const inner = document.createElement('div');
     inner.className = 'detail-inner' + (isExp ? ' open' : '');
-    inner.style.maxHeight = isExp ? '600px' : '0';
-
     const content = document.createElement('div');
     content.className = 'detail-content';
     visPlaces.forEach(p => {
       const pDiv = document.createElement('div');
       pDiv.className = 'place-item';
-      pDiv.innerHTML = `
-        <div class="place-name">${p.name}</div>
-        <span class="type-pill ${typePillClass(p.type)}">${p.type}</span>
-        <div class="place-years">${p.years.join(', ')}</div>
-      `;
+      pDiv.innerHTML =
+        '<div class="place-name">' + p.name + '</div>' +
+        '<span class="type-pill ' + typePillClass(p.type) + '">' + p.type + '</span>' +
+        '<div class="place-years">' + p.years.join(', ') + '</div>';
       content.appendChild(pDiv);
     });
     inner.appendChild(content);
@@ -479,7 +452,6 @@ function renderTable() {
     tbody.appendChild(dr);
   });
 
-  // Update sort arrows
   document.querySelectorAll('thead th.sortable').forEach(th => {
     th.classList.remove('sort-asc', 'sort-desc');
     if (th.dataset.col === sortCol) {
@@ -488,25 +460,17 @@ function renderTable() {
   });
 }
 
-function toggleCity(name) {
-  if (expandedCity === name) {
-    expandedCity = null;
-  } else {
-    expandedCity = name;
-  }
-  renderTable();
-}
-
 function populateFilters() {
   const countrySelect = document.getElementById('list-country');
   const listYearSelect = document.getElementById('list-year');
   const globeYearSelect = document.getElementById('g-year');
-  const countries = [...new Set(allCities.map(c => c.countryCode))].sort();
-  countries.forEach(code => {
-    const city = allCities.find(c => c.countryCode === code);
+  const seenCountries = new Map();
+  allCities.forEach(c => {
+    if (!seenCountries.has(c.countryCode)) seenCountries.set(c.countryCode, c.country);
+  });
+  [...seenCountries.entries()].sort((a, b) => a[1].localeCompare(b[1])).forEach(([code, name]) => {
     const opt = document.createElement('option');
-    opt.value = code;
-    opt.textContent = city ? city.country : code;
+    opt.value = code; opt.textContent = name;
     countrySelect.appendChild(opt);
   });
   const years = [...new Set(allCities.flatMap(c => c.allYears))].sort();
@@ -520,15 +484,15 @@ function populateFilters() {
   });
 }
 
-// ─────────────────────────────────────
-//  TAB 2 — GLOBE
-// ─────────────────────────────────────
+// ═══════════════════════════
+// TAB 2 — GLOBE
+// ═══════════════════════════
 function gFiltered() {
   const q = gSearch.toLowerCase();
   return allCities.filter(c => {
     const ms = !q || c.name.toLowerCase().includes(q) || c.places.some(p => p.name.toLowerCase().includes(q));
     const mt = gType === 'all' || c.places.some(p => p.type === gType);
-    const my = !gYear || c.allYears.includes(String(gYear));
+    const my = !gYear || c.allYears.includes(gYear);
     return ms && mt && my;
   });
 }
@@ -536,7 +500,7 @@ function gFiltered() {
 function gFPlaces(city) {
   return city.places.filter(p => {
     const mt = gType === 'all' || p.type === gType;
-    const my = !gYear || p.years.includes(String(gYear));
+    const my = !gYear || p.years.includes(gYear);
     return mt && my;
   });
 }
@@ -551,11 +515,14 @@ function renderGCityList() {
     count++;
     const d = document.createElement('div');
     d.className = 'gcity-item' + (gSelCity === c.name ? ' gsel' : '');
-    d.innerHTML = `<div class="gcity-n">${c.name}</div><div class="gcity-m">${c.country}</div><div class="gcity-p">${ps.length} place${ps.length !== 1 ? 's' : ''}</div>`;
+    d.innerHTML =
+      '<div class="gcity-n">' + c.name + '</div>' +
+      '<div class="gcity-m">' + c.country + '</div>' +
+      '<div class="gcity-p">' + ps.length + ' place' + (ps.length !== 1 ? 's' : '') + '</div>';
     d.addEventListener('click', () => {
       gSelCity = c.name;
       showPopup(c, null, null);
-      globe.pointOfView({ lat: c.lat, lng: c.lng, altitude: 1.4 }, 900);
+      if (globe) globe.pointOfView({ lat: c.lat, lng: c.lng, altitude: 1.4 }, 900);
     });
     el.appendChild(d);
   });
@@ -566,16 +533,17 @@ function showPopup(city, px, py) {
   gSelCity = city.name;
   document.getElementById('popup-city').textContent = city.name + ' · ' + city.country;
   const places = gFPlaces(city);
-  document.getElementById('popup-places').innerHTML = places.map(p => `
-    <div class="popup-place">
-      <div class="popup-pname">${p.name}</div>
-      <div class="popup-row">
-        <span class="type-pill ${typePillClass(p.type)}">${p.type}</span>
-        <span class="popup-yrs">${p.years.join(', ')}</span>
-      </div>
-    </div>`).join('');
+  document.getElementById('popup-places').innerHTML = places.map(p =>
+    '<div class="popup-place">' +
+      '<div class="popup-pname">' + p.name + '</div>' +
+      '<div class="popup-row">' +
+        '<span class="type-pill ' + typePillClass(p.type) + '">' + p.type + '</span>' +
+        '<span class="popup-yrs">' + p.years.join(', ') + '</span>' +
+      '</div>' +
+    '</div>'
+  ).join('');
   const popup = document.getElementById('popup');
-  if (px !== null) {
+  if (px !== null && px !== undefined) {
     const container = document.getElementById('globe-container');
     const rect = container.getBoundingClientRect();
     let x = px - rect.left, y = py - rect.top;
@@ -583,6 +551,9 @@ function showPopup(city, px, py) {
     if (y + 240 > rect.height) y -= 250;
     popup.style.left = Math.max(8, x) + 'px';
     popup.style.top = Math.max(8, y) + 'px';
+  } else {
+    popup.style.left = '20px';
+    popup.style.top = '70px';
   }
   popup.classList.add('vis');
   renderGCityList();
@@ -596,15 +567,18 @@ function hidePopup() {
   updateGlobe();
 }
 
-function calcRadius() {
-  const alt = globeReady ? (globe.pointOfView().altitude || 2.5) : 2.5;
-  return Math.max(0.015, Math.min(0.06, alt * 0.022));
-}
-
 function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
-  globe.customLayerData(fc.map(c => ({ ...c, _nPlaces: gFPlaces(c).length })));
+  const points = fc.map(c => ({
+    lat: c.lat,
+    lng: c.lng,
+    city: c,
+    size: 0.3,
+    color: gSelCity === c.name ? '#ffffff' : '#4f9cf9'
+  }));
+  globe.pointsData(points);
+
   if (globe._countriesData) {
     const visitedCodes = new Set(fc.map(c => c.countryCode));
     globe.polygonsData(globe._countriesData)
@@ -615,54 +589,9 @@ function updateGlobe() {
   }
 }
 
-let _zoomTimer = null;
-function rescaleOnZoom() {
-  if (!globeReady) return;
-  clearTimeout(_zoomTimer);
-  _zoomTimer = setTimeout(() => {
-    const r = calcRadius();
-    globe.customLayerData().forEach(d => {
-      if (d.__threeObj) {
-        const s = (r + Math.min((d._nPlaces || 1) * 0.003, 0.02)) * 200;
-        d.__threeObj.scale.set(s, s, s);
-      }
-    });
-  }, 60);
-}
-
-function makeCircleCanvas(selected) {
-  const size = 128;
-  const cv = document.createElement('canvas');
-  cv.width = size; cv.height = size;
-  const ctx = cv.getContext('2d');
-  ctx.beginPath();
-  ctx.arc(size / 2, size / 2, size / 2 - 8, 0, Math.PI * 2);
-  ctx.fillStyle = selected ? '#ffffff' : '#4f9cf9';
-  ctx.fill();
-  ctx.strokeStyle = selected ? 'rgba(255,255,255,0.6)' : 'rgba(100,180,255,0.5)';
-  ctx.lineWidth = 6;
-  ctx.stroke();
-  return cv;
-}
-
 async function initGlobe() {
   const el = document.getElementById('globe-el');
   const container = document.getElementById('globe-container');
-
-  // Build circle textures using the explicitly loaded THREE
-  const normalTex   = new THREE.CanvasTexture(makeCircleCanvas(false));
-  const selectedTex = new THREE.CanvasTexture(makeCircleCanvas(true));
-
-  function makeSprite(d) {
-    const mat = new THREE.SpriteMaterial({
-      map: gSelCity === d.name ? selectedTex : normalTex,
-      transparent: true, depthWrite: false
-    });
-    const sprite = new THREE.Sprite(mat);
-    const s = (calcRadius() + Math.min((d._nPlaces || 1) * 0.003, 0.02)) * 200;
-    sprite.scale.set(s, s, s);
-    return sprite;
-  }
 
   globe = Globe()(el)
     .backgroundColor('rgba(0,0,0,0)')
@@ -671,26 +600,22 @@ async function initGlobe() {
     .atmosphereColor('#4f9cf9')
     .atmosphereAltitude(0.18)
     .pointsData([])
-    .htmlElementsData([])
-    .customLayerData([])
-    .customThreeObject(d => makeSprite(d))
-    .customThreeObjectUpdate((obj, d) => {
-      const s = (calcRadius() + Math.min((d._nPlaces || 1) * 0.003, 0.02)) * 200;
-      obj.scale.set(s, s, s);
-      obj.material.map = gSelCity === d.name ? selectedTex : normalTex;
-      obj.material.needsUpdate = true;
+    .pointLat('lat')
+    .pointLng('lng')
+    .pointColor('color')
+    .pointAltitude(0.005)
+    .pointRadius('size')
+    .pointsMerge(false)
+    .pointsTransitionDuration(0)
+    .onPointClick((pt, ev) => {
+      if (pt && pt.city) showPopup(pt.city, ev.clientX, ev.clientY);
     })
-    .customLayerLat('lat')
-    .customLayerLng('lng')
-    .customLayerAltitude(0.01)
-    .onCustomLayerClick((d, ev) => { showPopup(d, ev.clientX, ev.clientY); })
-    .onCustomLayerHover(d => { el.style.cursor = d ? 'pointer' : 'default'; });
+    .onPointHover(pt => { el.style.cursor = pt ? 'pointer' : 'default'; });
 
   globe.controls().autoRotate = true;
   globe.controls().autoRotateSpeed = 0.5;
   globe.controls().enableZoom = true;
   el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
-  globe.controls().addEventListener('change', rescaleOnZoom);
 
   const ro = new ResizeObserver(() => {
     globe.width(container.clientWidth).height(container.clientHeight);
@@ -718,6 +643,7 @@ async function initGlobe() {
 
   globeReady = true;
   updateGlobe();
+  renderGCityList();
 }
 
 function applyGFilters() {
@@ -725,38 +651,39 @@ function applyGFilters() {
   updateGlobe();
 }
 
-// ─────────────────────────────────────
-//  Tabs
-// ─────────────────────────────────────
-let globeInited = false;
+// ─── Tabs ───
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
-    const panel = document.getElementById('panel-' + tab.dataset.tab);
-    panel.classList.add('active');
-    if (tab.dataset.tab === 'globe' && !globeInited) {
-      globeInited = true;
-      setTimeout(initGlobe, 50);
-    } else if (tab.dataset.tab === 'globe' && globeReady) {
-      setTimeout(() => {
-        const container = document.getElementById('globe-container');
-        globe.width(container.clientWidth).height(container.clientHeight);
-        updateGlobe();
-      }, 50);
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+
+    if (tab.dataset.tab === 'globe') {
+      if (!globeInited) {
+        globeInited = true;
+        setTimeout(initGlobe, 50);
+      } else if (globeReady) {
+        setTimeout(() => {
+          const container = document.getElementById('globe-container');
+          globe.width(container.clientWidth).height(container.clientHeight);
+          renderGCityList();
+        }, 50);
+      }
     }
   });
 });
 
-// ─────────────────────────────────────
-//  Boot
-// ─────────────────────────────────────
+// ─── Boot ───
 async function init() {
   let csvText;
-  try { csvText = await fetch(CSV_PATH).then(r => { if (!r.ok) throw new Error(); return r.text(); }); }
-  catch(e) {
-    document.getElementById('loading').innerHTML = '<div class="loading-txt" style="max-width:340px;text-align:center;">Could not load <code>places.csv</code> — make sure it is in the same folder as <code>index.html</code> and you are serving the files (not opening locally via file://).</div>';
+  try {
+    const res = await fetch(CSV_PATH);
+    if (!res.ok) throw new Error('fetch failed');
+    csvText = await res.text();
+  } catch(e) {
+    document.getElementById('loading').innerHTML =
+      '<div class="loading-txt" style="max-width:340px;text-align:center;">Could not load <code>places.csv</code> — make sure it is in the same folder as <code>index.html</code> and you are serving the files via http (not file://).</div>';
     return;
   }
   const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
@@ -765,8 +692,9 @@ async function init() {
   populateFilters();
   updateStats();
   renderTable();
+  renderGCityList(); // Populate the globe-tab city list now, before user switches tabs
 
-  // Wire list controls
+  // List controls
   document.getElementById('list-search').addEventListener('input', e => { listSearch = e.target.value; expandedCity = null; renderTable(); });
   document.getElementById('list-country').addEventListener('change', e => { listCountry = e.target.value; expandedCity = null; renderTable(); });
   document.getElementById('list-type').addEventListener('change', e => { listType = e.target.value; expandedCity = null; renderTable(); });
@@ -780,10 +708,8 @@ async function init() {
     });
   });
 
-  // Wire globe controls
+  // Globe controls
   document.getElementById('g-search').addEventListener('input', e => { gSearch = e.target.value; applyGFilters(); });
-
-  // Search bar expand/collapse
   const gfbarSearch = document.getElementById('gfbar-search');
   document.getElementById('gfbar-search-btn').addEventListener('click', () => {
     gfbarSearch.classList.toggle('open');
@@ -803,31 +729,21 @@ async function init() {
       applyGFilters();
     }
   });
-
-  // Year dropdown
-  document.getElementById('g-year').addEventListener('change', e => {
-    gYear = e.target.value ? parseInt(e.target.value) : 0;
-    applyGFilters();
-  });
-
-  // Type pills
+  document.getElementById('g-year').addEventListener('change', e => { gYear = e.target.value; applyGFilters(); });
   document.querySelectorAll('.tbtn').forEach(btn => {
     btn.addEventListener('click', () => {
       gType = btn.dataset.t;
-      document.querySelectorAll('.tbtn').forEach(b => b.className = 'tbtn');
+      document.querySelectorAll('.tbtn').forEach(b => { b.className = 'tbtn'; });
       btn.classList.add('ta-' + gType);
       applyGFilters();
     });
   });
-
-  // City panel toggle
   document.getElementById('glist-toggle').addEventListener('click', () => {
     document.getElementById('gcity-panel').classList.toggle('open');
   });
   document.getElementById('gcity-panel-close').addEventListener('click', () => {
     document.getElementById('gcity-panel').classList.remove('open');
   });
-
   document.getElementById('popup-close').addEventListener('click', hidePopup);
 
   document.getElementById('loading').style.display = 'none';
