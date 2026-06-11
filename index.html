@@ -567,14 +567,32 @@ function hidePopup() {
   updateGlobe();
 }
 
+// Great-circle distance between two lat/lng points, returned in degrees
+function greatCircleDist(lat1, lng1, lat2, lng2) {
+  const rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad;
+  const dLng = (lng2 - lng1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * Math.asin(Math.min(1, Math.sqrt(a))) * 180 / Math.PI;
+}
+
+// Point radius scaled to zoom level: small dots when zoomed in, larger when zoomed out
+function calcDotRadius() {
+  if (!globeReady) return 0.3;
+  const alt = globe.pointOfView().altitude || 2.5;
+  return Math.max(0.05, Math.min(0.32, alt * 0.13));
+}
+
 function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
+  const r = calcDotRadius();
   const points = fc.map(c => ({
     lat: c.lat,
     lng: c.lng,
     city: c,
-    size: 0.3,
+    size: r,
     color: gSelCity === c.name ? '#ffffff' : '#4f9cf9'
   }));
   globe.pointsData(points);
@@ -607,15 +625,62 @@ async function initGlobe() {
     .pointRadius('size')
     .pointsMerge(false)
     .pointsTransitionDuration(0)
-    .onPointClick((pt, ev) => {
-      if (pt && pt.city) showPopup(pt.city, ev.clientX, ev.clientY);
-    })
     .onPointHover(pt => { el.style.cursor = pt ? 'pointer' : 'default'; });
 
   globe.controls().autoRotate = true;
   globe.controls().autoRotateSpeed = 0.5;
   globe.controls().enableZoom = true;
-  el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
+
+  // Track mousedown vs mouseup to distinguish click from drag
+  let mouseDownPos = null;
+  el.addEventListener('mousedown', (ev) => {
+    globe.controls().autoRotate = false;
+    mouseDownPos = { x: ev.clientX, y: ev.clientY };
+  });
+  el.addEventListener('mouseup', (ev) => {
+    if (!mouseDownPos) return;
+    const dx = ev.clientX - mouseDownPos.x;
+    const dy = ev.clientY - mouseDownPos.y;
+    const moved = Math.sqrt(dx * dx + dy * dy);
+    mouseDownPos = null;
+    if (moved > 5) return; // it was a drag, not a click
+
+    // Custom click handler: convert pixel coords to lat/lng on the globe,
+    // then find the closest city within a zoom-dependent threshold.
+    if (!globeReady) return;
+    const rect = el.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    const y = ev.clientY - rect.top;
+    const hit = globe.toGlobeCoords(x, y);
+    if (!hit) return; // click landed outside the globe sphere
+
+    const alt = globe.pointOfView().altitude;
+    // Threshold in degrees: tight when zoomed in, generous when zoomed out
+    const threshold = Math.max(0.7, Math.min(15, alt * 4));
+
+    let closest = null;
+    let minDist = threshold;
+    gFiltered().forEach(c => {
+      const d = greatCircleDist(hit.lat, hit.lng, c.lat, c.lng);
+      if (d < minDist) {
+        minDist = d;
+        closest = c;
+      }
+    });
+
+    if (closest) {
+      showPopup(closest, ev.clientX, ev.clientY);
+    }
+  });
+
+  // Debounced rescale on zoom — updates dot sizes without breaking the
+  // custom click handler (which doesn't depend on point meshes at all)
+  let zoomTimer = null;
+  globe.controls().addEventListener('change', () => {
+    if (!globeReady) return;
+    clearTimeout(zoomTimer);
+    zoomTimer = setTimeout(updateGlobe, 80);
+  });
 
   const ro = new ResizeObserver(() => {
     globe.width(container.clientWidth).height(container.clientHeight);
