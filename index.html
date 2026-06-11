@@ -599,15 +599,15 @@ function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
 
-  // Flat 2D HTML markers — always face camera, no cylinder extrusion
-  const markers = fc.map(c => ({
+  // Flat 3D points (altitude 0 = flush with surface, no cylinder extrusion, no drift)
+  const points = fc.map(c => ({
     lat: c.lat, lng: c.lng, city: c,
-    nPlaces: gFPlaces(c).length,
-    selected: gSelCity === c.name
+    size: 0.4 + Math.min(gFPlaces(c).length * 0.1, 0.6),
+    color: gSelCity === c.name ? '#ffffff' : '#4f9cf9'
   }));
-  globe.htmlElementsData(markers);
+  globe.pointsData(points);
 
-  // Choropleth — polygonAltitude set higher (0.01) to avoid z-fighting flicker
+  // Choropleth — altitude kept above 0 to avoid z-fighting flicker
   if (globe._countriesData) {
     const visitedCodes = new Set(fc.map(c => c.countryCode));
     globe.polygonsData(globe._countriesData)
@@ -634,29 +634,17 @@ async function initGlobe() {
     .bumpImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
     .atmosphereColor('#4f9cf9')
     .atmosphereAltitude(0.18)
-    // HTML markers replace 3D point cylinders
-    .htmlElementsData([])
-    .htmlLat('lat').htmlLng('lng').htmlAltitude(0.01)
-    .htmlElement(d => {
-      const el = document.createElement('div');
-      const size = 10 + Math.min(d.nPlaces * 2, 10);
-      el.style.cssText = `
-        width:${size}px;height:${size}px;border-radius:50%;
-        background:${d.selected ? '#ffffff' : '#4f9cf9'};
-        border:2px solid ${d.selected ? 'rgba(255,255,255,0.9)' : 'rgba(79,156,249,0.5)'};
-        box-shadow:0 0 ${d.selected ? 10 : 6}px ${d.selected ? 'rgba(255,255,255,0.7)' : 'rgba(79,156,249,0.6)'};
-        cursor:pointer;
-        transform:translate(-50%,-50%);
-        transition:transform 0.1s;
-      `;
-      el.addEventListener('mouseenter', () => { el.style.transform = 'translate(-50%,-50%) scale(1.4)'; });
-      el.addEventListener('mouseleave', () => { el.style.transform = 'translate(-50%,-50%) scale(1)'; });
-      el.addEventListener('click', ev => {
-        ev.stopPropagation();
-        showPopup(d.city, ev.clientX, ev.clientY);
-      });
-      return el;
-    });
+    // pointAltitude 0 = flat disc on surface, not an extruded cylinder
+    .pointsData([])
+    .pointLat('lat').pointLng('lng')
+    .pointColor('color')
+    .pointAltitude(0)
+    .pointRadius('size')
+    .pointsMerge(false)
+    .onPointClick((pt, ev) => { showPopup(pt.city, ev.clientX, ev.clientY); })
+    .onPointHover(pt => { el.style.cursor = pt ? 'pointer' : 'default'; })
+    // Clear html layer
+    .htmlElementsData([]);
 
   globe.controls().autoRotate = true;
   globe.controls().autoRotateSpeed = 0.5;
