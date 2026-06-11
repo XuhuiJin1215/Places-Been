@@ -595,14 +595,15 @@ function hidePopup() {
   updateGlobe();
 }
 
+function calcRadius() {
+  const alt = globeReady ? (globe.pointOfView().altitude || 2.5) : 2.5;
+  return Math.max(0.06, Math.min(0.45, alt * 0.18));
+}
+
 function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
-
-  // Scale radius with camera altitude: small when zoomed in, visible when zoomed out.
-  // globe.pointOfView().altitude is roughly 0.1 (close) to 3.5 (far).
-  const alt = globeReady ? (globe.pointOfView().altitude || 2.5) : 2.5;
-  const baseRadius = Math.max(0.08, Math.min(0.5, alt * 0.18));
+  const baseRadius = calcRadius();
   const points = fc.map(c => ({
     lat: c.lat, lng: c.lng, city: c,
     size: baseRadius + Math.min(gFPlaces(c).length * 0.015, 0.1),
@@ -625,6 +626,18 @@ function updateGlobe() {
         return visitedCodes.has(code) ? 0.012 : 0.005;
       });
   }
+}
+
+// Rescale point radii only — does NOT rebuild pointsData, so clicks stay intact
+let _zoomTimer = null;
+function rescaleOnZoom() {
+  if (!globeReady) return;
+  clearTimeout(_zoomTimer);
+  _zoomTimer = setTimeout(() => {
+    const baseRadius = calcRadius();
+    // Update size in-place by reassigning pointRadius accessor
+    globe.pointRadius(d => baseRadius + Math.min(d.city.places.length * 0.015, 0.1));
+  }, 60);
 }
 
 async function initGlobe() {
@@ -653,8 +666,8 @@ async function initGlobe() {
   globe.controls().autoRotateSpeed = 0.5;
   globe.controls().enableZoom = true;
   el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
-  // Rescale dots on every zoom/pan so they stay visually small at all altitudes
-  globe.controls().addEventListener('change', () => { updateGlobe(); });
+  // Rescale dot sizes on zoom without rebuilding the mesh (preserves click handlers)
+  globe.controls().addEventListener('change', rescaleOnZoom);
 
   // Responsive sizing
   const ro = new ResizeObserver(() => {
