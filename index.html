@@ -597,36 +597,23 @@ function hidePopup() {
 
 function calcRadius() {
   const alt = globeReady ? (globe.pointOfView().altitude || 2.5) : 2.5;
-  // Returns globe-radius fraction: shrinks as you zoom in
   return Math.max(0.015, Math.min(0.06, alt * 0.022));
 }
 
 function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
-
-  // Custom layer: Three.js Sprites — always face camera, no cylinder extrusion,
-  // reliably raycasted by globe.gl at any zoom level
   globe.customLayerData(fc.map(c => ({ ...c, _nPlaces: gFPlaces(c).length })));
-
-  // Choropleth
   if (globe._countriesData) {
     const visitedCodes = new Set(fc.map(c => c.countryCode));
     globe.polygonsData(globe._countriesData)
-      .polygonCapColor(f => {
-        const code = f.properties._iso3 || '';
-        return visitedCodes.has(code) ? 'rgba(79,156,249,0.22)' : 'rgba(255,255,255,0.03)';
-      })
+      .polygonCapColor(f => visitedCodes.has(f.properties._iso3 || '') ? 'rgba(79,156,249,0.22)' : 'rgba(255,255,255,0.03)')
       .polygonSideColor(() => 'rgba(255,255,255,0.01)')
       .polygonStrokeColor(() => 'rgba(255,255,255,0.07)')
-      .polygonAltitude(f => {
-        const code = f.properties._iso3 || '';
-        return visitedCodes.has(code) ? 0.012 : 0.005;
-      });
+      .polygonAltitude(f => visitedCodes.has(f.properties._iso3 || '') ? 0.012 : 0.005);
   }
 }
 
-// Rescale sprite sizes on zoom
 let _zoomTimer = null;
 function rescaleOnZoom() {
   if (!globeReady) return;
@@ -635,34 +622,33 @@ function rescaleOnZoom() {
     const r = calcRadius();
     globe.customLayerData().forEach(d => {
       if (d.__threeObj) {
-        const s = (r + Math.min(d._nPlaces * 0.003, 0.02)) * 200;
+        const s = (r + Math.min((d._nPlaces || 1) * 0.003, 0.02)) * 200;
         d.__threeObj.scale.set(s, s, s);
       }
     });
   }, 60);
 }
 
-// Build a circle sprite texture once
-function makeCircleTexture(color, selected) {
-  const size = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  const cx = size / 2, cy = size / 2, r = size / 2 - 3;
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+function makeCircleCanvas(selected) {
+  const size = 128;
+  const cv = document.createElement('canvas');
+  cv.width = size; cv.height = size;
+  const ctx = cv.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 8, 0, Math.PI * 2);
   ctx.fillStyle = selected ? '#ffffff' : '#4f9cf9';
   ctx.fill();
-  ctx.strokeStyle = selected ? 'rgba(255,255,255,0.8)' : 'rgba(79,156,249,0.5)';
-  ctx.lineWidth = 3; ctx.stroke();
-  return canvas;
+  ctx.strokeStyle = selected ? 'rgba(255,255,255,0.6)' : 'rgba(100,180,255,0.5)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  return cv;
 }
 
 async function initGlobe() {
   const el = document.getElementById('globe-el');
   const container = document.getElementById('globe-container');
 
-  // Globe.gl bundles Three.js internally but may not expose it globally.
-  // Initialise globe first, then grab THREE from the scene's renderer context.
+  // Init globe without custom layer first so controls are available
   globe = Globe()(el)
     .backgroundColor('rgba(0,0,0,0)')
     .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-dark.jpg')
@@ -678,85 +664,59 @@ async function initGlobe() {
   el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
   globe.controls().addEventListener('change', rescaleOnZoom);
 
-  // Responsive sizing
   const ro = new ResizeObserver(() => {
     globe.width(container.clientWidth).height(container.clientHeight);
   });
   ro.observe(container);
   globe.width(container.clientWidth).height(container.clientHeight);
 
-  // Wait one frame for globe internals to initialise, then grab THREE
-  await new Promise(r => setTimeout(r, 100));
+  // Wait a tick so globe.gl finishes setup and exposes THREE on window
+  await new Promise(r => setTimeout(r, 150));
 
-  // THREE is exposed on the window by globe.gl's bundle
+  // Set up sprite custom layer using window.THREE (exposed by globe.gl bundle)
   const T = window.THREE;
+  if (T) {
+    const normalTex   = new T.CanvasTexture(makeCircleCanvas(false));
+    const selectedTex = new T.CanvasTexture(makeCircleCanvas(true));
 
-  function makeCircleTex(selected) {
-    const size = 128;
-    const c = document.createElement('canvas');
-    c.width = size; c.height = size;
-    const ctx = c.getContext('2d');
-    ctx.beginPath(); ctx.arc(size/2, size/2, size/2 - 6, 0, Math.PI*2);
-    ctx.fillStyle = selected ? '#ffffff' : '#4f9cf9';
-    ctx.fill();
-    ctx.strokeStyle = selected ? 'rgba(255,255,255,0.6)' : 'rgba(100,180,255,0.5)';
-    ctx.lineWidth = 6; ctx.stroke();
-    return c;
-  }
-
-  const normalTex   = T ? new T.CanvasTexture(makeCircleTex(false)) : null;
-  const selectedTex = T ? new T.CanvasTexture(makeCircleTex(true))  : null;
-
-  const makeSprite = (d, selected) => {
-    if (!T) return new (class { scale={set(){}} material={needsUpdate:false,map:null} })();
-    const mat = new T.SpriteMaterial({
-      map: selected ? selectedTex : normalTex,
-      transparent: true, depthWrite: false, sizeAttenuation: true
-    });
-    const sprite = new T.Sprite(mat);
-    const r = calcRadius();
-    const s = (r + Math.min((d._nPlaces||1) * 0.003, 0.02)) * 200;
-    sprite.scale.set(s, s, s);
-    return sprite;
-  };
-
-  globe
-    .customLayerData([])
-    .customThreeObject(d => makeSprite(d, gSelCity === d.name))
-    .customThreeObjectUpdate((obj, d) => {
-      const r = calcRadius();
-      const s = (r + Math.min((d._nPlaces||1) * 0.003, 0.02)) * 200;
-      obj.scale.set(s, s, s);
-      if (obj.material) {
+    globe
+      .customLayerData([])
+      .customThreeObject(d => {
+        const mat = new T.SpriteMaterial({ map: gSelCity === d.name ? selectedTex : normalTex, transparent: true, depthWrite: false });
+        const sprite = new T.Sprite(mat);
+        const s = (calcRadius() + Math.min((d._nPlaces || 1) * 0.003, 0.02)) * 200;
+        sprite.scale.set(s, s, s);
+        return sprite;
+      })
+      .customThreeObjectUpdate((obj, d) => {
+        const s = (calcRadius() + Math.min((d._nPlaces || 1) * 0.003, 0.02)) * 200;
+        obj.scale.set(s, s, s);
         obj.material.map = gSelCity === d.name ? selectedTex : normalTex;
         obj.material.needsUpdate = true;
-      }
-    })
-    .customLayerLat('lat')
-    .customLayerLng('lng')
-    .customLayerAltitude(0.01)
-    .onCustomLayerClick((d, ev) => { showPopup(d, ev.clientX, ev.clientY); })
-    .onCustomLayerHover(d => { el.style.cursor = d ? 'pointer' : 'default'; });
+      })
+      .customLayerLat('lat')
+      .customLayerLng('lng')
+      .customLayerAltitude(0.01)
+      .onCustomLayerClick((d, ev) => { showPopup(d, ev.clientX, ev.clientY); })
+      .onCustomLayerHover(d => { el.style.cursor = d ? 'pointer' : 'default'; });
+  } else {
+    // Fallback if THREE not on window: use standard points layer
+    console.warn('THREE not found on window, falling back to pointsData');
+    globe
+      .pointsData([]).pointLat('lat').pointLng('lng')
+      .pointColor('color').pointAltitude(0.02).pointRadius('size').pointsMerge(false)
+      .pointsTransitionDuration(0)
+      .onPointClick((pt, ev) => { showPopup(pt, ev.clientX, ev.clientY); })
+      .onPointHover(pt => { el.style.cursor = pt ? 'pointer' : 'default'; });
+  }
 
-  // Responsive sizing
-  const ro = new ResizeObserver(() => {
-    globe.width(container.clientWidth).height(container.clientHeight);
-  });
-  ro.observe(container);
-  globe.width(container.clientWidth).height(container.clientHeight);
-
-  // Load choropleth — Natural Earth Admin-0 Map Units (splits territories/SARs)
-  // ISO_A3 is baked into each feature's properties directly; no numeric lookup needed.
-  // French Guiana=GUF, Hong Kong=HKG, Macau=MAC, Puerto Rico=PRI etc. are separate polygons.
-  // Hawaii & Alaska remain part of the USA polygon (same as real administrative practice).
+  // Load choropleth
   try {
     const res = await fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_map_units.geojson');
     const geojson = await res.json();
-    // Normalise: some features use ISO_A3_EH or ADM0_A3 as fallback when ISO_A3 is -99
     geojson.features.forEach(f => {
       const p = f.properties;
-      f.properties._iso3 = (p.ISO_A3 && p.ISO_A3 !== '-99')
-        ? p.ISO_A3
+      f.properties._iso3 = (p.ISO_A3 && p.ISO_A3 !== '-99') ? p.ISO_A3
         : (p.ISO_A3_EH && p.ISO_A3_EH !== '-99') ? p.ISO_A3_EH : (p.ADM0_A3 || '');
     });
     globe._countriesData = geojson.features;
