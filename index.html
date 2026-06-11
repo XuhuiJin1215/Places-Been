@@ -598,17 +598,16 @@ function hidePopup() {
 function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
-  // Scale dot size by current camera altitude (zoom level)
-  const alt = globe.pointOfView().altitude || 2.5;
-  const zoomScale = Math.max(0.3, Math.min(1.0, alt / 2.5));
-  const points = fc.map(c => ({
-    lat: c.lat, lng: c.lng, city: c,
-    size: (0.28 + Math.min(gFPlaces(c).length * 0.09, 0.7)) * zoomScale,
-    color: gSelCity === c.name ? '#ffffff' : '#4f9cf9'
-  }));
-  globe.pointsData(points);
 
-  // Choropleth
+  // Flat 2D HTML markers — always face camera, no cylinder extrusion
+  const markers = fc.map(c => ({
+    lat: c.lat, lng: c.lng, city: c,
+    nPlaces: gFPlaces(c).length,
+    selected: gSelCity === c.name
+  }));
+  globe.htmlElementsData(markers);
+
+  // Choropleth — polygonAltitude set higher (0.01) to avoid z-fighting flicker
   if (globe._countriesData) {
     const visitedCodes = new Set(fc.map(c => c.countryCode));
     globe.polygonsData(globe._countriesData)
@@ -616,9 +615,11 @@ function updateGlobe() {
         const code = f.properties._iso3 || '';
         return visitedCodes.has(code) ? 'rgba(79,156,249,0.22)' : 'rgba(255,255,255,0.03)';
       })
+      .polygonSideColor(() => 'rgba(255,255,255,0.01)')
+      .polygonStrokeColor(() => 'rgba(255,255,255,0.07)')
       .polygonAltitude(f => {
         const code = f.properties._iso3 || '';
-        return visitedCodes.has(code) ? 0.006 : 0.001;
+        return visitedCodes.has(code) ? 0.012 : 0.005;
       });
   }
 }
@@ -633,17 +634,34 @@ async function initGlobe() {
     .bumpImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
     .atmosphereColor('#4f9cf9')
     .atmosphereAltitude(0.18)
-    .pointLat('lat').pointLng('lng')
-    .pointColor('color').pointAltitude(0.01).pointRadius('size').pointsMerge(false)
-    .onPointClick((pt, ev) => { showPopup(pt.city, ev.clientX, ev.clientY); })
-    .onPointHover(pt => { el.style.cursor = pt ? 'pointer' : 'default'; });
+    // HTML markers replace 3D point cylinders
+    .htmlElementsData([])
+    .htmlLat('lat').htmlLng('lng').htmlAltitude(0.01)
+    .htmlElement(d => {
+      const el = document.createElement('div');
+      const size = 10 + Math.min(d.nPlaces * 2, 10);
+      el.style.cssText = `
+        width:${size}px;height:${size}px;border-radius:50%;
+        background:${d.selected ? '#ffffff' : '#4f9cf9'};
+        border:2px solid ${d.selected ? 'rgba(255,255,255,0.9)' : 'rgba(79,156,249,0.5)'};
+        box-shadow:0 0 ${d.selected ? 10 : 6}px ${d.selected ? 'rgba(255,255,255,0.7)' : 'rgba(79,156,249,0.6)'};
+        cursor:pointer;
+        transform:translate(-50%,-50%);
+        transition:transform 0.1s;
+      `;
+      el.addEventListener('mouseenter', () => { el.style.transform = 'translate(-50%,-50%) scale(1.4)'; });
+      el.addEventListener('mouseleave', () => { el.style.transform = 'translate(-50%,-50%) scale(1)'; });
+      el.addEventListener('click', ev => {
+        ev.stopPropagation();
+        showPopup(d.city, ev.clientX, ev.clientY);
+      });
+      return el;
+    });
 
   globe.controls().autoRotate = true;
   globe.controls().autoRotateSpeed = 0.5;
   globe.controls().enableZoom = true;
   el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
-  // Update point sizes on zoom
-  globe.controls().addEventListener('change', () => { updateGlobe(); });
 
   // Responsive sizing
   const ro = new ResizeObserver(() => {
@@ -672,7 +690,7 @@ async function initGlobe() {
       .polygonCapColor(() => 'rgba(255,255,255,0.03)')
       .polygonSideColor(() => 'rgba(255,255,255,0.01)')
       .polygonStrokeColor(() => 'rgba(255,255,255,0.07)')
-      .polygonAltitude(0.001);
+      .polygonAltitude(0.005);
   } catch(e) { console.warn('Choropleth unavailable', e); }
 
   globeReady = true;
