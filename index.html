@@ -599,10 +599,13 @@ function updateGlobe() {
   if (!globeReady) return;
   const fc = gFiltered();
 
-  // Flat 3D points (altitude 0 = flush with surface, no cylinder extrusion, no drift)
+  // Scale radius with camera altitude: small when zoomed in, visible when zoomed out.
+  // globe.pointOfView().altitude is roughly 0.1 (close) to 3.5 (far).
+  const alt = globeReady ? (globe.pointOfView().altitude || 2.5) : 2.5;
+  const baseRadius = Math.max(0.08, Math.min(0.5, alt * 0.18));
   const points = fc.map(c => ({
     lat: c.lat, lng: c.lng, city: c,
-    size: 0.4 + Math.min(gFPlaces(c).length * 0.1, 0.6),
+    size: baseRadius + Math.min(gFPlaces(c).length * 0.015, 0.1),
     color: gSelCity === c.name ? '#ffffff' : '#4f9cf9'
   }));
   globe.pointsData(points);
@@ -650,6 +653,8 @@ async function initGlobe() {
   globe.controls().autoRotateSpeed = 0.5;
   globe.controls().enableZoom = true;
   el.addEventListener('mousedown', () => { globe.controls().autoRotate = false; });
+  // Rescale dots on every zoom/pan so they stay visually small at all altitudes
+  globe.controls().addEventListener('change', () => { updateGlobe(); });
 
   // Responsive sizing
   const ro = new ResizeObserver(() => {
